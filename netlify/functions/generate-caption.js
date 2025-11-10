@@ -1,5 +1,5 @@
 // netlify/functions/generate-caption.js
-// This serverless function securely handles OpenAI API calls
+// Using SiliconFlow API for caption generation
 
 exports.handler = async (event, context) => {
   // Only allow POST requests
@@ -56,30 +56,32 @@ Requirements:
 - Make each caption unique and engaging
 - Include appropriate emojis and hashtags where suitable
 - Each caption should be ready to post
+- Write in natural, native English
 
 Provide 5 distinct captions, separated by "---"`;
 
-    // Call OpenAI API
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    // Call SiliconFlow API (OpenAI-compatible endpoint)
+    const response = await fetch('https://api.siliconflow.cn/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`
+        'Authorization': `Bearer ${process.env.SILICONFLOW_API_KEY}`
       },
       body: JSON.stringify({
-        model: 'gpt-3.5-turbo',
+        model: 'Qwen/Qwen2.5-7B-Instruct',  // You can change to other models
         messages: [{
           role: 'user',
           content: prompt
         }],
         temperature: 0.8,
-        max_tokens: 1000
+        max_tokens: 1000,
+        stream: false
       })
     });
 
     if (!response.ok) {
       const errorData = await response.json();
-      console.error('OpenAI API error:', errorData);
+      console.error('SiliconFlow API error:', errorData);
       return {
         statusCode: response.status,
         body: JSON.stringify({ 
