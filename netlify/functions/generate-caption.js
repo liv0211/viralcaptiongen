@@ -1,532 +1,128 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Caption Generator - Create Viral Social Media Captions</title>
-    <meta name="description" content="Generate engaging social media captions instantly. Choose your style, platform, and let AI create viral content for you.">
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
 
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: #fff;
-            line-height: 1.6;
-            min-height: 100vh;
-        }
+// netlify/functions/generate-caption.js
+// Using SiliconFlow API for caption generation
 
-        /* Navigation */
-        nav {
-            background: rgba(255, 255, 255, 0.1);
-            backdrop-filter: blur(10px);
-            padding: 1rem 2rem;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-        }
+exports.handler = async (event, context) => {
+  // Only allow POST requests
+  if (event.httpMethod !== 'POST') {
+    return {
+      statusCode: 405,
+      body: JSON.stringify({ error: 'Method not allowed' })
+    };
+  }
 
-        .nav-container {
-            max-width: 1200px;
-            margin: 0 auto;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
+  try {
+    // Parse the request body
+    const { topic, platform, style, length } = JSON.parse(event.body);
 
-        .logo {
-            font-size: 1.5rem;
-            font-weight: bold;
-            background: linear-gradient(45deg, #fff, #f0f0f0);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            text-decoration: none;
-        }
+    // Validate inputs
+    if (!topic || !platform || !style || !length) {
+      return {
+        statusCode: 400,
+        body: JSON.stringify({ error: 'Missing required parameters' })
+      };
+    }
 
-        .nav-links {
-            display: flex;
-            gap: 2rem;
-            list-style: none;
-        }
+    // Define style and platform guides
+    const lengthGuide = {
+      'short': '1-2 sentences',
+      'medium': '3-5 sentences',
+      'long': '6-8 sentences'
+    };
 
-        .nav-links a {
-            color: #fff;
-            text-decoration: none;
-            transition: opacity 0.3s;
-            font-weight: 500;
-        }
+    const styleGuide = {
+      'casual': 'friendly and conversational',
+      'professional': 'polished and business-appropriate',
+      'funny': 'humorous and entertaining',
+      'inspirational': 'motivational and uplifting',
+      'engaging': 'attention-grabbing with questions or calls-to-action'
+    };
 
-        .nav-links a:hover {
-            opacity: 0.7;
-        }
+    const platformGuide = {
+      'instagram': 'Include relevant hashtags and emojis. Encourage engagement.',
+      'youtube': 'Focus on video description style with hooks. Can include timestamp format.',
+      'twitter': 'Keep it concise and impactful. Consider character limits.',
+      'facebook': 'Conversational and community-focused.',
+      'linkedin': 'Professional tone with industry insights.',
+      'tiktok': 'Trendy, short, and hook-driven with popular hashtags.'
+    };
 
-        /* Main Container */
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 3rem 2rem;
-        }
+    // Construct the AI prompt
+    const prompt = `Generate 5 different social media captions about: "${topic}"
 
-        .page-title {
-            text-align: center;
-            font-size: 2.5rem;
-            margin-bottom: 1rem;
-            font-weight: 800;
-        }
+Requirements:
+- Platform: ${platform} - ${platformGuide[platform]}
+- Style: ${styleGuide[style]}
+- Length: ${lengthGuide[length]}
+- Make each caption unique and engaging
+- Include appropriate emojis and hashtags where suitable
+- Each caption should be ready to post
+- Write in natural, native English
 
-        .page-subtitle {
-            text-align: center;
-            font-size: 1.2rem;
-            opacity: 0.9;
-            margin-bottom: 3rem;
-        }
+Provide 5 distinct captions, separated by "---"`;
 
-        /* Tool Layout */
-        .tool-layout {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 2rem;
-        }
+    // Call SiliconFlow API (OpenAI-compatible endpoint)
+    const response = await fetch('https://api.siliconflow.cn/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${process.env.SILICONFLOW_API_KEY}`
+      },
+      body: JSON.stringify({
+        model: 'Qwen/Qwen2.5-7B-Instruct',  // You can change to other models
+        messages: [{
+          role: 'user',
+          content: prompt
+        }],
+        temperature: 0.8,
+        max_tokens: 1000,
+        stream: false
+      })
+    });
 
-        /* Input Section */
-        .input-section {
-            background: rgba(255, 255, 255, 0.1);
-            backdrop-filter: blur(10px);
-            border-radius: 20px;
-            padding: 2rem;
-            border: 1px solid rgba(255, 255, 255, 0.2);
-        }
+    if (!response.ok) {
+      const errorData = await response.json();
+      console.error('SiliconFlow API error:', errorData);
+      return {
+        statusCode: response.status,
+        body: JSON.stringify({ 
+          error: 'Failed to generate captions',
+          details: errorData 
+        })
+      };
+    }
 
-        .form-group {
-            margin-bottom: 1.5rem;
-        }
+    const data = await response.json();
+    const generatedText = data.choices[0].message.content;
 
-        .form-group label {
-            display: block;
-            margin-bottom: 0.5rem;
-            font-weight: 600;
-            font-size: 1rem;
-        }
+    // Split the response into individual captions
+    const captions = generatedText.split('---')
+      .map(caption => caption.trim())
+      .filter(caption => caption.length > 0)
+      .slice(0, 5);
 
-        .form-group input,
-        .form-group textarea,
-        .form-group select {
-            width: 100%;
-            padding: 0.75rem;
-            border: 1px solid rgba(255, 255, 255, 0.3);
-            border-radius: 10px;
-            background: rgba(255, 255, 255, 0.1);
-            color: #fff;
-            font-size: 1rem;
-            font-family: inherit;
-            transition: all 0.3s;
-        }
+    // Return success response
+    return {
+      statusCode: 200,
+      headers: {
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Headers': 'Content-Type'
+      },
+      body: JSON.stringify({ 
+        captions,
+        success: true 
+      })
+    };
 
-        .form-group input::placeholder,
-        .form-group textarea::placeholder {
-            color: rgba(255, 255, 255, 0.6);
-        }
-
-        .form-group input:focus,
-        .form-group textarea:focus,
-        .form-group select:focus {
-            outline: none;
-            border-color: #fff;
-            background: rgba(255, 255, 255, 0.15);
-        }
-
-        .form-group textarea {
-            min-height: 100px;
-            resize: vertical;
-        }
-
-        .form-group select {
-            cursor: pointer;
-        }
-
-        .form-group select option {
-            background: #667eea;
-            color: #fff;
-        }
-
-        /* Style Pills */
-        .style-pills {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 0.75rem;
-        }
-
-        .style-pill {
-            padding: 0.5rem 1rem;
-            border-radius: 20px;
-            border: 2px solid rgba(255, 255, 255, 0.3);
-            background: rgba(255, 255, 255, 0.1);
-            cursor: pointer;
-            transition: all 0.3s;
-            font-size: 0.9rem;
-        }
-
-        .style-pill:hover {
-            background: rgba(255, 255, 255, 0.2);
-        }
-
-        .style-pill.active {
-            background: #fff;
-            color: #667eea;
-            border-color: #fff;
-        }
-
-        /* Generate Button */
-        .generate-btn {
-            width: 100%;
-            padding: 1rem;
-            background: #fff;
-            color: #667eea;
-            border: none;
-            border-radius: 10px;
-            font-size: 1.1rem;
-            font-weight: bold;
-            cursor: pointer;
-            transition: all 0.3s;
-            margin-top: 1rem;
-        }
-
-        .generate-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
-        }
-
-        .generate-btn:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
-
-        /* Results Section */
-        .results-section {
-            background: rgba(255, 255, 255, 0.1);
-            backdrop-filter: blur(10px);
-            border-radius: 20px;
-            padding: 2rem;
-            border: 1px solid rgba(255, 255, 255, 0.2);
-        }
-
-        .results-title {
-            font-size: 1.3rem;
-            margin-bottom: 1.5rem;
-            font-weight: 700;
-        }
-
-        .caption-card {
-            background: rgba(255, 255, 255, 0.1);
-            border-radius: 15px;
-            padding: 1.5rem;
-            margin-bottom: 1rem;
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            position: relative;
-            transition: all 0.3s;
-        }
-
-        .caption-card:hover {
-            background: rgba(255, 255, 255, 0.15);
-        }
-
-        .caption-text {
-            line-height: 1.6;
-            margin-bottom: 1rem;
-            padding-right: 2rem;
-        }
-
-        .caption-actions {
-            display: flex;
-            gap: 0.5rem;
-        }
-
-        .copy-btn {
-            padding: 0.5rem 1rem;
-            background: rgba(255, 255, 255, 0.2);
-            border: 1px solid rgba(255, 255, 255, 0.3);
-            border-radius: 8px;
-            color: #fff;
-            cursor: pointer;
-            font-size: 0.9rem;
-            transition: all 0.3s;
-        }
-
-        .copy-btn:hover {
-            background: rgba(255, 255, 255, 0.3);
-        }
-
-        .copy-btn.copied {
-            background: #4ade80;
-            border-color: #4ade80;
-        }
-
-        .empty-state {
-            text-align: center;
-            padding: 3rem 2rem;
-            opacity: 0.7;
-        }
-
-        .empty-state-icon {
-            font-size: 4rem;
-            margin-bottom: 1rem;
-        }
-
-        .loading {
-            text-align: center;
-            padding: 2rem;
-        }
-
-        .spinner {
-            width: 50px;
-            height: 50px;
-            border: 4px solid rgba(255, 255, 255, 0.3);
-            border-top-color: #fff;
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-            margin: 0 auto 1rem;
-        }
-
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
-
-        /* Responsive */
-        @media (max-width: 968px) {
-            .tool-layout {
-                grid-template-columns: 1fr;
-            }
-            
-            .page-title {
-                font-size: 2rem;
-            }
-        }
-    </style>
-</head>
-<body>
-    <!-- Navigation -->
-    <nav>
-        <div class="nav-container">
-            <a href="index.html" class="logo">ViralCaptionGen</a>
-            <ul class="nav-links">
-                <li><a href="index.html#features">Features</a></li>
-                <li><a href="index.html#how-it-works">How It Works</a></li>
-                <li><a href="blog.html">Blog</a></li>
-                <li><a href="tool.html">Generator</a></li>
-            </ul>
-        </div>
-    </nav>
-
-    <!-- Main Content -->
-    <div class="container">
-        <h1 class="page-title">AI Caption Generator</h1>
-        <p class="page-subtitle">Create engaging social media captions in seconds</p>
-
-        <div class="tool-layout">
-            <!-- Input Section -->
-            <div class="input-section">
-                <form id="captionForm">
-                    <div class="form-group">
-                        <label for="topic">Topic or Keywords</label>
-                        <textarea id="topic" placeholder="e.g., Morning coffee, sunset at the beach, fitness motivation..." required></textarea>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="platform">Platform</label>
-                        <select id="platform">
-                            <option value="instagram">Instagram</option>
-                            <option value="youtube">YouTube</option>
-                            <option value="twitter">Twitter</option>
-                            <option value="facebook">Facebook</option>
-                            <option value="linkedin">LinkedIn</option>
-                            <option value="tiktok">TikTok</option>
-                        </select>
-                    </div>
-
-                    <div class="form-group">
-                        <label>Caption Style</label>
-                        <div class="style-pills">
-                            <div class="style-pill active" data-style="casual">Casual</div>
-                            <div class="style-pill" data-style="professional">Professional</div>
-                            <div class="style-pill" data-style="funny">Funny</div>
-                            <div class="style-pill" data-style="inspirational">Inspirational</div>
-                            <div class="style-pill" data-style="engaging">Engaging</div>
-                        </div>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="length">Caption Length</label>
-                        <select id="length">
-                            <option value="short">Short (1-2 sentences)</option>
-                            <option value="medium" selected>Medium (3-5 sentences)</option>
-                            <option value="long">Long (6+ sentences)</option>
-                        </select>
-                    </div>
-
-                    <button type="submit" class="generate-btn" id="generateBtn">
-                        Generate Captions
-                    </button>
-                </form>
-            </div>
-
-            <!-- Results Section -->
-            <div class="results-section">
-                <h2 class="results-title">Generated Captions</h2>
-                <div id="resultsContainer">
-                    <div class="empty-state">
-                        <div class="empty-state-icon">📝</div>
-                        <p>Your generated captions will appear here</p>
-                        <p style="font-size: 0.9rem; margin-top: 0.5rem; opacity: 0.8;">Fill in the form and click "Generate Captions" to get started</p>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <script>
-        let selectedStyle = 'casual';
-
-        // Style pill selection
-        document.querySelectorAll('.style-pill').forEach(pill => {
-            pill.addEventListener('click', function() {
-                document.querySelectorAll('.style-pill').forEach(p => p.classList.remove('active'));
-                this.classList.add('active');
-                selectedStyle = this.dataset.style;
-            });
-        });
-
-        // Form submission
-        document.getElementById('captionForm').addEventListener('submit', async function(e) {
-            e.preventDefault();
-            
-            const topic = document.getElementById('topic').value;
-            const platform = document.getElementById('platform').value;
-            const length = document.getElementById('length').value;
-            const resultsContainer = document.getElementById('resultsContainer');
-            const generateBtn = document.getElementById('generateBtn');
-            
-            // Show loading state
-            generateBtn.disabled = true;
-            generateBtn.textContent = 'Generating...';
-            resultsContainer.innerHTML = `
-                <div class="loading">
-                    <div class="spinner"></div>
-                    <p>Creating captions for you...</p>
-                </div>
-            `;
-            
-            // Simulate API call (replace with your actual API)
-            await new Promise(resolve => setTimeout(resolve, 2000));
-            
-            // Generate captions (this is demo data - replace with actual API call)
-            const captions = generateDemoCaptions(topic, platform, selectedStyle, length);
-            
-            // Display results
-            resultsContainer.innerHTML = captions.map((caption, index) => `
-                <div class="caption-card">
-                    <div class="caption-text">${caption}</div>
-                    <div class="caption-actions">
-                        <button class="copy-btn" onclick="copyCaption(this, ${index})">Copy</button>
-                    </div>
-                </div>
-            `).join('');
-            
-            // Reset button
-            generateBtn.disabled = false;
-            generateBtn.textContent = 'Generate Captions';
-        });
-
-        // Copy function
-        function copyCaption(button, index) {
-            const captionText = button.parentElement.previousElementSibling.textContent;
-            navigator.clipboard.writeText(captionText).then(() => {
-                button.textContent = 'Copied!';
-                button.classList.add('copied');
-                setTimeout(() => {
-                    button.textContent = 'Copy';
-                    button.classList.remove('copied');
-                }, 2000);
-            });
-        }
-
-        // AI-powered caption generator - calls secure backend API
-        async function generateDemoCaptions(topic, platform, style, length) {
-            try {
-                // Call your secure Netlify Function
-                const response = await fetch('/.netlify/functions/generate-caption', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        topic,
-                        platform,
-                        style,
-                        length
-                    })
-                });
-
-                if (!response.ok) {
-                    console.error('API response not ok:', response.status);
-                    throw new Error('API request failed');
-                }
-
-                const data = await response.json();
-                
-                if (data.success && data.captions && Array.isArray(data.captions)) {
-                    return data.captions;
-                } else {
-                    console.error('Invalid response format:', data);
-                    throw new Error('Invalid response from API');
-                }
-                
-            } catch (error) {
-                console.error('Error generating captions:', error);
-                
-                // Fallback to high-quality demo captions
-                const demoTemplates = {
-                    casual: [
-                        `Just vibing with ${topic} and honestly? Best decision ever. Who else is obsessed? 💭`,
-                        `${topic} hitting different today. Tag someone who needs to see this! 👇`,
-                        `POV: You're experiencing ${topic} and everything just clicks. Drop a ❤️ if you relate!`,
-                        `Can we normalize appreciating ${topic} more? This energy is unmatched. 🌟`,
-                        `${topic} and chill? More like ${topic} and thrill! Who's with me? 🙋‍♀️`
-                    ],
-                    professional: [
-                        `Exploring ${topic}: Key insights and strategic perspectives for ${platform} success.`,
-                        `Why ${topic} matters in today's landscape. Sharing professional observations and takeaways.`,
-                        `${topic} - A deep dive into best practices and industry trends. What's your experience?`,
-                        `Elevating our approach to ${topic}. Here's what we've learned and implemented.`,
-                        `Professional perspective on ${topic}: Insights that drive real results.`
-                    ],
-                    funny: [
-                        `Me: I don't need ${topic}. Also me: *obsessed with ${topic}* 😂`,
-                        `${topic}? More like ${topic} my entire personality now. No regrets! 🤪`,
-                        `Expectation: Normal day. Reality: ${topic} took over my life. Send help (but not really) 😅`,
-                        `If ${topic} is wrong, I don't want to be right. Fight me. 😤`,
-                        `${topic} said "be iconic" and I took that personally. 💅`
-                    ],
-                    inspirational: [
-                        `${topic} taught me that growth happens when we embrace new experiences. Keep pushing forward! ✨`,
-                        `Let ${topic} remind you: Every moment is an opportunity to create something beautiful. 🌟`,
-                        `In a world of ordinary, be ${topic}. Dare to stand out and inspire others. 💫`,
-                        `${topic} proves that the best things happen when we step outside our comfort zone. Keep going! 🚀`,
-                        `Your journey with ${topic} is uniquely yours. Embrace it, learn from it, grow from it. 🌱`
-                    ],
-                    engaging: [
-                        `Quick poll: Team ${topic} or nah? Drop your honest thoughts below! 👇💭`,
-                        `${topic} - yes or no? I'm curious what you all think! Comment your take! 💬`,
-                        `Hot take: ${topic} is underrated. Change my mind in the comments! 🔥`,
-                        `Question for you: How has ${topic} impacted your ${platform} game? Let's discuss! 💡`,
-                        `${topic} crew, where you at? Drop a 🙋 if this resonates with you!`
-                    ]
-                };
-
-                return demoTemplates[style] || demoTemplates.casual;
-            }
-        }
-    </script>
-</body>
-</html>
+  } catch (error) {
+    console.error('Function error:', error);
+    return {
+      statusCode: 500,
+      body: JSON.stringify({ 
+        error: 'Internal server error',
+        message: error.message 
+      })
+    };
+  }
+};
