@@ -469,32 +469,62 @@
                 });
 
                 if (!response.ok) {
+                    console.error('API response not ok:', response.status);
                     throw new Error('API request failed');
                 }
 
                 const data = await response.json();
                 
-                if (data.success && data.captions) {
+                if (data.success && data.captions && Array.isArray(data.captions)) {
                     return data.captions;
                 } else {
+                    console.error('Invalid response format:', data);
                     throw new Error('Invalid response from API');
                 }
                 
             } catch (error) {
                 console.error('Error generating captions:', error);
                 
-                // Fallback to demo captions if API fails
-                return [
-                    `${topic} - because every moment deserves to be captured and shared! What's your favorite part of the day? #${topic.replace(/\s+/g, '')} #${platform}`,
-                    
-                    `Here's the thing about ${topic}: it's not just a moment, it's a vibe. Who else feels this way? Drop a comment if you agree!`,
-                    
-                    `${topic} hits different when you're living in the moment. Tag someone who needs to see this!`,
-                    
-                    `POV: You're experiencing ${topic} and everything just feels right. Double tap if you can relate! #mood #vibes`,
-                    
-                    `Can we just appreciate ${topic} for a second? This is what life's all about! Who's with me? #grateful #${platform}life`
-                ];
+                // Fallback to high-quality demo captions
+                const demoTemplates = {
+                    casual: [
+                        `Just vibing with ${topic} and honestly? Best decision ever. Who else is obsessed? 💭`,
+                        `${topic} hitting different today. Tag someone who needs to see this! 👇`,
+                        `POV: You're experiencing ${topic} and everything just clicks. Drop a ❤️ if you relate!`,
+                        `Can we normalize appreciating ${topic} more? This energy is unmatched. 🌟`,
+                        `${topic} and chill? More like ${topic} and thrill! Who's with me? 🙋‍♀️`
+                    ],
+                    professional: [
+                        `Exploring ${topic}: Key insights and strategic perspectives for ${platform} success.`,
+                        `Why ${topic} matters in today's landscape. Sharing professional observations and takeaways.`,
+                        `${topic} - A deep dive into best practices and industry trends. What's your experience?`,
+                        `Elevating our approach to ${topic}. Here's what we've learned and implemented.`,
+                        `Professional perspective on ${topic}: Insights that drive real results.`
+                    ],
+                    funny: [
+                        `Me: I don't need ${topic}. Also me: *obsessed with ${topic}* 😂`,
+                        `${topic}? More like ${topic} my entire personality now. No regrets! 🤪`,
+                        `Expectation: Normal day. Reality: ${topic} took over my life. Send help (but not really) 😅`,
+                        `If ${topic} is wrong, I don't want to be right. Fight me. 😤`,
+                        `${topic} said "be iconic" and I took that personally. 💅`
+                    ],
+                    inspirational: [
+                        `${topic} taught me that growth happens when we embrace new experiences. Keep pushing forward! ✨`,
+                        `Let ${topic} remind you: Every moment is an opportunity to create something beautiful. 🌟`,
+                        `In a world of ordinary, be ${topic}. Dare to stand out and inspire others. 💫`,
+                        `${topic} proves that the best things happen when we step outside our comfort zone. Keep going! 🚀`,
+                        `Your journey with ${topic} is uniquely yours. Embrace it, learn from it, grow from it. 🌱`
+                    ],
+                    engaging: [
+                        `Quick poll: Team ${topic} or nah? Drop your honest thoughts below! 👇💭`,
+                        `${topic} - yes or no? I'm curious what you all think! Comment your take! 💬`,
+                        `Hot take: ${topic} is underrated. Change my mind in the comments! 🔥`,
+                        `Question for you: How has ${topic} impacted your ${platform} game? Let's discuss! 💡`,
+                        `${topic} crew, where you at? Drop a 🙋 if this resonates with you!`
+                    ]
+                };
+
+                return demoTemplates[style] || demoTemplates.casual;
             }
         }
     </script>
